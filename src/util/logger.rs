@@ -26,7 +26,6 @@ impl Logger {
 
     pub fn error(&mut self, line: u32, token_index: u32, log: String) {
         self.logs.push_back(Log {line, token_index, log});
-        println!()
     }
 }
 
@@ -39,6 +38,7 @@ pub struct Log {
 #[macro_export]
 macro_rules! error_log {
     ($logger:expr, $line:expr, $index:expr, $($arg:tt)+) => {{
-        $logger.error($line, $index, format!($($arg)*))
+        $logger.error($line, $index, format!($($arg)*));
+        return
     }}
 }

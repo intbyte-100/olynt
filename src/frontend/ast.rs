@@ -30,20 +30,18 @@ impl AST {
 }
 
 pub type LineInfo<'a> = (u32, &'a String);
-pub(crate) struct ASTGenerator<'a, 'b> {
+pub(crate) struct ASTGenerator<'a> {
     token_buffer: LinkedList<Token>,
     logger: &'a mut Logger,
-    line_info: Option<&'a (u32, &'b String)>,
     ast: &'a mut AST,
     func_declared: bool,
 }
 
-impl<'a, 'b> ASTGenerator<'a, 'b> {
+impl<'a, 'b> ASTGenerator<'a> {
     pub fn new(logger: &'a mut Logger, ast: &'a mut AST) -> Self {
         ASTGenerator {
             token_buffer: LinkedList::new(),
             logger: logger,
-            line_info: None,
             ast: ast,
             func_declared: false,
         }
@@ -60,28 +58,34 @@ impl<'a, 'b> ASTGenerator<'a, 'b> {
     fn parse_func(&mut self, line: &LineInfo) {}
 
     fn define_submodule(&mut self, line: &LineInfo) {
-        let token = self.token_buffer.pop_front();
+        if let Some(token) = self.token_buffer.pop_front() {
+            let state = WordTokenMatcher::from(token).equals("submodule");
 
-        let token = match token {
-            Some(x) => x,
-            None => return,
-        };
+            if !state.mask.is_ok() {
+                error_log!(
+                    self.logger,
+                    line.0,
+                    0,
+                    "Syntax error: expected submodule definition, but '{}' provided",
+                    state.token.unwrap()
+                );
+            }
+        } else {
+            return;
+        }
 
-        let state = WordTokenMatcher::from(token).equals("submodule");
-        
-        if !state.mask.is_ok() {
-            Some(error_log!(
+        if let Some(token) = self.token_buffer.pop_front() {
+            if let Token::Word(_, name) = token {
+                self.ast.submodule = Some(name);
+                return;
+            }
+            error_log!(
                 self.logger,
                 line.0,
                 0,
-                "Syntax error: expected submodule definition, but '{}' provided",
-                state.token.unwrap()
-            ));
-
-            return
-        } 
-
-        
+                "Syntax error: invalid submodule name"
+            );
+        }
     }
 
     pub fn finish_sentence(&mut self, line: &LineInfo) {
@@ -92,9 +96,5 @@ impl<'a, 'b> ASTGenerator<'a, 'b> {
         } else {
             self.define_func(line)
         }
-    }
-
-    pub fn set_line_info(&mut self, line_info: Option<&'a (u32, &'b String)>) {
-        self.line_info = line_info;
     }
 }
