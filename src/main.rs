@@ -21,9 +21,8 @@ fn main() {
         Box::new(stdout()),
     );
 
-    let mut lexer = Parser::new(&mut lines, &mut binding);
+    let mut lexer = Parser::new(&mut lines.enumerate(), &mut binding);
 
-    let tokens = lexer.parse();
 
     return;
 }

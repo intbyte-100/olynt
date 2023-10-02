@@ -1,6 +1,6 @@
 use std::{collections::LinkedList, io::Write};
 
-use crate::frontend::ast::LineInfo;
+
 
 pub enum LoggerType {
     ONLY_ERRORS,
@@ -25,7 +25,11 @@ impl Logger {
     }
 
     pub fn error(&mut self, line: u32, token_index: u32, log: String) {
-        self.logs.push_back(Log {line, token_index, log});
+        self.logs.push_back(Log {
+            line,
+            token_index,
+            log,
+        });
     }
 }
 

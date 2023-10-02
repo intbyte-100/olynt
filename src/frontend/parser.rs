@@ -1,4 +1,4 @@
-use std::{io, str::CharIndices};
+use std::{collections::LinkedList, io, iter::Enumerate, str::CharIndices};
 
 use crate::{
     frontend::ast::{ASTGenerator, AST},
@@ -8,12 +8,13 @@ use crate::{
 
 use super::{token::Token, util::is_special_symbol};
 
-type Lines = io::Lines<io::BufReader<std::fs::File>>;
+type Lines = Enumerate<io::Lines<io::BufReader<std::fs::File>>>;
 
 pub struct Parser<'a> {
     line_index: u32,
     lines: &'a mut Lines,
     logger: &'a mut Logger,
+    buffer: LinkedList<Token>,
 }
 
 impl<'a> Parser<'a> {
@@ -22,31 +23,35 @@ impl<'a> Parser<'a> {
             line_index: 1,
             lines,
             logger,
+            buffer: LinkedList::new(),
         }
     }
 
-    pub fn parse(&mut self) -> AST {
-        let mut ast = AST::new();
-        let mut ast_generator = ASTGenerator::new(self.logger, &mut ast);
+    fn parse_line(&mut self) -> Result<(), ()> {
+        if let Some(line) = self.lines.next() {
+            let string = line.1.unwrap();
+            let mut parser = LineLexer::new(&string);
 
-        for i in &mut *self.lines {
-            let line = i.unwrap();
-            let info = (self.line_index, &line);
-
-            {
-                let mut parser = LineLexer::new(&line);
-
-                while let Some(token) = parser.next() {
-                    ast_generator.push(&info, Token::parse(self.line_index, token))
-                }
-
-                ast_generator.push(&info, Token::NewLine(self.line_index))
+            while let Some(token) = parser.next() {
+                self.buffer.push_back(Token::parse(line.0 as u32, token))
             }
 
-            self.line_index += 1;
+            self.buffer.push_back(Token::NewLine(line.0 as u32));
+            return Ok(());
         }
 
-        ast
+        Err(())
+    }
+    pub(crate) fn next(&mut self) -> Option<Token> {
+        if let Some(token) = self.buffer.pop_front() {
+            return Some(token);
+        }
+
+        if self.parse_line().is_ok() {
+            return self.next();
+        }
+
+        return None;
     }
 }
 
@@ -123,6 +128,3 @@ impl<'a> LineLexer<'a> {
         &&self.string_source[fisrt_char.0..end]
     }
 }
-
-
-

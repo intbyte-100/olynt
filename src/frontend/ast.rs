@@ -29,7 +29,7 @@ impl AST {
     }
 }
 
-pub type LineInfo<'a> = (u32, &'a String);
+
 pub(crate) struct ASTGenerator<'a> {
     token_buffer: LinkedList<Token>,
     logger: &'a mut Logger,
@@ -46,27 +46,38 @@ impl<'a, 'b> ASTGenerator<'a> {
             func_declared: false,
         }
     }
-    pub fn push(&mut self, line: &LineInfo, token: Token) {
+    pub fn push(&mut self, line: &u32, token: Token) {
         match token {
             Token::NewLine(_) => self.finish_sentence(line),
             _ => self.token_buffer.push_back(token),
         };
     }
 
-    fn define_func(&mut self, line: &LineInfo) {}
+    fn define_func(&mut self, line: &u32) {}
 
-    fn parse_func(&mut self, line: &LineInfo) {}
+    fn parse_expresion(&mut self, line: &u32) {}
 
-    fn define_submodule(&mut self, line: &LineInfo) {
+    fn define_submodule(&mut self, line: &u32) {
+        if self.ast.submodule.is_some() {
+            self.ast.compilation_failed = true;
+            error_log!(
+                self.logger,
+                *line,
+                0,
+                "Submodule error: module already has defined"
+            )
+        }
+
         if let Some(token) = self.token_buffer.pop_front() {
             let state = WordTokenMatcher::from(token).equals("submodule");
 
             if !state.mask.is_ok() {
+                self.ast.compilation_failed = true;
                 error_log!(
                     self.logger,
-                    line.0,
+                    *line,
                     0,
-                    "Syntax error: expected submodule definition, but '{}' provided",
+                    "Submodule error: expected submodule definition, but '{}' provided",
                     state.token.unwrap()
                 );
             }
@@ -79,20 +90,21 @@ impl<'a, 'b> ASTGenerator<'a> {
                 self.ast.submodule = Some(name);
                 return;
             }
+            self.ast.compilation_failed = true;
             error_log!(
                 self.logger,
-                line.0,
+                *line,
                 0,
-                "Syntax error: invalid submodule name"
+                "Submodule error: invalid submodule name"
             );
         }
     }
 
-    pub fn finish_sentence(&mut self, line: &LineInfo) {
+    pub fn finish_sentence(&mut self, line: &u32) {
         if self.ast.submodule.is_none() {
             self.define_submodule(line);
         } else if self.func_declared {
-            self.parse_func(line)
+            self.parse_expresion(line)
         } else {
             self.define_func(line)
         }
